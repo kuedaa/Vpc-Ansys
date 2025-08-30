@@ -28,3 +28,11 @@ variable "availability_zones" {
   default = ["us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d", "us-east-1e", "us-east-1f"]
   
 }
+
+variable "instance_type" {
+  default = "t2.micro"
+}
+
+variable "ami" {
+  default = "ami-0c7217cdde317cfec"
+}
