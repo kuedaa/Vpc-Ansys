@@ -5,3 +5,6 @@ data "terraform_remote_state" "vpc" {
   }
 }
 
+data "aws_availability_zones" "available" {
+  state = "available"
+}

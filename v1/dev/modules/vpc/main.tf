@@ -6,4 +6,3 @@ resource "aws_vpc" "main" {
     Env = "${var.env}"
   }
 }
-

@@ -2,7 +2,8 @@ resource "aws_subnet" "private_subnet" {
   vpc_id     = data.terraform_remote_state.vpc.outputs.vpc_id
   count = var.number_subnet
   cidr_block = var.cidr_private_subnet[count.index]
-  availability_zone = var.availability_zones[count.index]
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+  map_public_ip_on_launch = false
 
   tags = {
     Name = "Private-Subnet-AZ${count.index}"
@@ -14,7 +15,8 @@ resource "aws_subnet" "public_subnet" {
   vpc_id     = data.terraform_remote_state.vpc.outputs.vpc_id
   count = var.number_subnet
   cidr_block = var.cidr_public_subnet[count.index]
-  availability_zone = var.availability_zones[count.index]
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+  map_public_ip_on_launch = true
 
   tags = {
     Name = "Public-Subnet-AZ${count.index}"
@@ -22,10 +24,11 @@ resource "aws_subnet" "public_subnet" {
   }
 }
 
-resource "aws_internet_gateway" "gw" {
-  vpc_id     = data.terraform_remote_state.vpc.outputs.vpc_id
+resource "aws_eip" "eip" {
+  count = var.number_subnet
+  domain   = "vpc"
   tags = {
-    Name = "IG"
+    Name = "eip-AZ${count.index}"
     Env = "${var.env}"
   }
 }
@@ -38,16 +41,43 @@ resource "aws_nat_gateway" "nat_gateway" {
     Name = "Nat_gateway-AZ${count.index}"
     Env = "${var.env}"
   }
-  depends_on = [aws_internet_gateway.gw]
 }
-# EIP for NAT Gateway in AZ A
-resource "aws_eip" "eip" {
-  count = var.number_subnet
-  domain   = "vpc"
+
+resource "aws_route_table" "public" {
+  vpc_id     = data.terraform_remote_state.vpc.outputs.vpc_id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = data.terraform_remote_state.vpc.outputs.igw_id
+  }
   tags = {
-    Name = "eip-AZ${count.index}"
+    Name = "Main-Route-Table"
     Env = "${var.env}"
   }
+}
+
+resource "aws_route_table_association" "public_assoc" {
+  count = var.number_subnet
+  subnet_id      = aws_subnet.public_subnet[count.index].id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table" "private" {
+  count = var.number_subnet
+  vpc_id     = data.terraform_remote_state.vpc.outputs.vpc_id
+  route {
+    cidr_block = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat_gateway[count.index].id
+  }
+tags = {
+    Name = "private-rt-${count.index}"
+    Env = "${var.env}"
+  }
+}
+
+resource "aws_route_table_association" "private_assoc" {
+  count = var.number_subnet
+  subnet_id = aws_subnet.private_subnet[count.index].id
+  route_table_id = aws_route_table.private[count.index].id
 }
 
 
